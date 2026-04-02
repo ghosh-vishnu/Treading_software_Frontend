@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-top: #050607;
+  --bg-bottom: #090b0f;
+  --text-main: #e8ecef;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--text-main);
+  background:
+    radial-gradient(circle at top right, rgba(155, 255, 0, 0.12) 0%, transparent 35%),
+    radial-gradient(circle at bottom left, rgba(26, 214, 173, 0.08) 0%, transparent 30%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+}
+
+.glass-panel {
+  @apply rounded-2xl border border-[#1A1E23] bg-[#0A0D13]/90 shadow-panel backdrop-blur;
+}
