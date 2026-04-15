@@ -100,3 +100,104 @@ export type CopyLeaderStats = {
   total_copied_trades: number;
   win_rate: number;
 };
+
+export type UserSettings = {
+  id: number;
+  user_id: number;
+  theme: "dark" | "light";
+  accent_color: string;
+  notify_trade_alerts: boolean;
+  notify_strategy_alerts: boolean;
+  notify_system_alerts: boolean;
+  default_lot_size: string;
+  max_open_positions: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UserSettingsUpdateRequest = {
+  theme: "dark" | "light";
+  accent_color: string;
+  notify_trade_alerts: boolean;
+  notify_strategy_alerts: boolean;
+  notify_system_alerts: boolean;
+  default_lot_size: number;
+  max_open_positions: number;
+};
+
+export type KYCRecord = {
+  id: number;
+  user_id: number;
+  status: "pending" | "approved" | "rejected";
+  document_type: string;
+  document_id: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  verified_at: string | null;
+};
+
+export type KYCSubmitRequest = {
+  document_type: string;
+  document_id: string;
+  notes?: string | null;
+};
+
+export type AcademyArticle = {
+  id: number;
+  title: string;
+  slug: string;
+  category: string;
+  summary: string;
+  content_markdown: string;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyArticleCreateRequest = {
+  title: string;
+  slug: string;
+  category: string;
+  summary: string;
+  content_markdown: string;
+  is_published: boolean;
+};
+
+export type BacktestRun = {
+  id: number;
+  user_id: number;
+  strategy_tag: string;
+  symbol: string;
+  timeframe: string;
+  periods: number;
+  roi: number;
+  drawdown: number;
+  win_rate: number;
+  report_json: string;
+  created_at: string;
+};
+
+export type BacktestRunRequest = {
+  strategy_tag: string;
+  symbol: string;
+  timeframe: string;
+  periods: number;
+  initial_capital: number;
+};
+
+export type AppNotification = {
+  id: number;
+  user_id: number;
+  category: string;
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};
+
+export type CreateNotificationRequest = {
+  category: string;
+  title: string;
+  message: string;
+};

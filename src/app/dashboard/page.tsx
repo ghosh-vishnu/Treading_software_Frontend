@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
   const openNotificationPage = () => {
     setShowProfileMenu(false);
-    router.push("/dashboard/profile?tab=notification");
+    router.push("/dashboard/notifications");
   };
 
   const winRate =
@@ -130,10 +130,10 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#141B23] pb-4">
             <nav className="flex items-center gap-5 text-sm">
               <button className="font-semibold text-[#F7FAFD]">Dashboard</button>
-              <button className="text-[#8D98A5] hover:text-[#DEE6EE]">Watchlist</button>
-              <button className="text-[#8D98A5] hover:text-[#DEE6EE]">Mirror Leaders</button>
-              <button className="text-[#8D98A5] hover:text-[#DEE6EE]">Strategies</button>
-              <button className="text-[#8D98A5] hover:text-[#DEE6EE]">Positions</button>
+              <button onClick={() => router.push("/dashboard/academy")} className="text-[#8D98A5] hover:text-[#DEE6EE]">Academy</button>
+              <button onClick={() => router.push("/dashboard/backtesting")} className="text-[#8D98A5] hover:text-[#DEE6EE]">Backtesting</button>
+              <button onClick={() => router.push("/dashboard/notifications")} className="text-[#8D98A5] hover:text-[#DEE6EE]">Notifications</button>
+              <button onClick={() => router.push("/dashboard/settings")} className="text-[#8D98A5] hover:text-[#DEE6EE]">Settings</button>
             </nav>
 
             <div className="relative flex items-center gap-2">
@@ -178,6 +178,15 @@ export default function DashboardPage() {
                     className="w-full rounded-lg px-3 py-2 text-left text-sm text-[#D5DEE8] hover:bg-[#111822]"
                   >
                     Trading Account
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      router.push("/dashboard/kyc");
+                    }}
+                    className="w-full rounded-lg px-3 py-2 text-left text-sm text-[#D5DEE8] hover:bg-[#111822]"
+                  >
+                    KYC
                   </button>
                   <div className="my-1 border-t border-[#1F2833]" />
                   <button

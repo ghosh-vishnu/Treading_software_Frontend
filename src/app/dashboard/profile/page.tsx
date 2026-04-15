@@ -100,6 +100,8 @@ export default function ProfilePage() {
   const [connectedAccounts, setConnectedAccounts] = useState<BrokerAccount[]>([]);
   const [loadingTrading, setLoadingTrading] = useState(false);
   const [tradingError, setTradingError] = useState<string | null>(null);
+  const [tradingMessage, setTradingMessage] = useState<string | null>(null);
+  const [removingAccountId, setRemovingAccountId] = useState<number | null>(null);
   const [showAddAccountCatalog, setShowAddAccountCatalog] = useState(false);
 
   const deltaConnected = (brokerSnapshot?.balance?.broker || "").toLowerCase().includes("delta");
@@ -139,6 +141,7 @@ export default function ProfilePage() {
       setShowAddAccountCatalog(false);
       setLoadingTrading(true);
       setTradingError(null);
+      setTradingMessage(null);
       void api
         .get<BrokerAccount[]>("/broker/accounts")
         .then(async (accountsResponse) => {
@@ -302,6 +305,39 @@ export default function ProfilePage() {
 
   const closeAddAccountCatalog = () => {
     setShowAddAccountCatalog(false);
+  };
+
+  const removeAccount = async (account: BrokerAccount) => {
+    const confirmed = window.confirm(`Remove ${formatBrokerName(account.broker_name)} account?`);
+    if (!confirmed) {
+      return;
+    }
+
+    setTradingError(null);
+    setTradingMessage(null);
+    setRemovingAccountId(account.id);
+
+    try {
+      await api.delete(`/broker/accounts/${account.id}`);
+      const nextAccounts = connectedAccounts.filter((item) => item.id !== account.id);
+      setConnectedAccounts(nextAccounts);
+      if (nextAccounts.length === 0) {
+        setBrokerSnapshot(null);
+      } else {
+        try {
+          const snapshotResponse = await api.get<BrokerAccountSnapshot>("/broker/account");
+          setBrokerSnapshot(snapshotResponse.data);
+        } catch {
+          setBrokerSnapshot(null);
+        }
+      }
+      setTradingMessage("Broker account removed successfully.");
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail;
+      setTradingError(typeof detail === "string" ? detail : "Failed to remove broker account.");
+    } finally {
+      setRemovingAccountId(null);
+    }
   };
 
   return (
@@ -533,6 +569,10 @@ export default function ProfilePage() {
                       <div className="mt-4 rounded-xl border border-[#4F2A2A] bg-[#2A1414] px-4 py-3 text-sm text-[#FFB4B4]">{tradingError}</div>
                     ) : null}
 
+                    {tradingMessage ? (
+                      <div className="mt-4 rounded-xl border border-[#31503A] bg-[#142419] px-4 py-3 text-sm text-[#AEE7B8]">{tradingMessage}</div>
+                    ) : null}
+
                     <div className="mt-6 divide-y divide-[#20262E] rounded-2xl border border-[#1E2530] bg-[#0C1117]">
                       {connectedAccounts.length === 0 && !loadingTrading ? (
                         <div className="px-5 py-8 text-sm text-[#93A0AD]">No connected accounts yet. Click Add Account to connect your broker.</div>
@@ -558,7 +598,12 @@ export default function ProfilePage() {
 
                             <div className="flex items-center gap-3">
                               <p className="text-2xl font-semibold text-[#F3F7FB]">{rowBalance}</p>
-                              <button className="rounded-full border border-[#2A313A] p-2 text-[#AAB4C0] hover:bg-[#10151D]" aria-label="Remove account">
+                              <button
+                                onClick={() => void removeAccount(account)}
+                                disabled={removingAccountId === account.id}
+                                className="rounded-full border border-[#2A313A] p-2 text-[#AAB4C0] hover:bg-[#10151D] disabled:cursor-not-allowed disabled:opacity-60"
+                                aria-label="Remove account"
+                              >
                                 <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M3 6h18" />
                                   <path d="M8 6V4h8v2" />
