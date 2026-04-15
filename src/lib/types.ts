@@ -48,6 +48,7 @@ export type BrokerAccount = {
   created_at: string;
   updated_at: string;
   metadata_json: string | null;
+  display_client_id?: string | null;
 };
 
 export type BrokerBalance = {

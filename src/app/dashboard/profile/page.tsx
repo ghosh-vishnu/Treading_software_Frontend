@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
-import type { UserProfile } from "@/lib/types";
+import type { BrokerAccount, UserProfile } from "@/lib/types";
 
 type ActiveTab = "profile" | "trading" | "password" | "notification";
 
@@ -30,6 +30,19 @@ type ProfileFormState = {
   public_profile: boolean;
 };
 
+type PasswordFormState = {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+};
+
+type BrokerCatalogItem = {
+  id: string;
+  name: string;
+  badge: string;
+  comingSoon?: boolean;
+};
+
 const DEFAULT_PROFILE_FORM: ProfileFormState = {
   full_name: "",
   username: "",
@@ -42,10 +55,27 @@ const DEFAULT_PROFILE_FORM: ProfileFormState = {
   public_profile: true,
 };
 
+const DEFAULT_PASSWORD_FORM: PasswordFormState = {
+  current_password: "",
+  new_password: "",
+  confirm_password: "",
+};
+
 const TAB_LABELS: Array<{ key: ActiveTab; label: string }> = [
   { key: "profile", label: "Profile Setting" },
   { key: "trading", label: "Trading Account" },
   { key: "password", label: "Password Reset" },
+];
+
+const BROKER_CATALOG: BrokerCatalogItem[] = [
+  { id: "coinswitch", name: "CoinSwitch", badge: "CS" },
+  { id: "shark", name: "Shark", badge: "SH" },
+  { id: "cryptx", name: "Cryptx", badge: "CX" },
+  { id: "bybit", name: "ByBit", badge: "BB" },
+  { id: "pi42", name: "Pi42", badge: "P4", comingSoon: true },
+  { id: "binance", name: "Binance", badge: "BN", comingSoon: true },
+  { id: "coindcx", name: "CoinDCX", badge: "CD", comingSoon: true },
+  { id: "mudrex", name: "Mudrex", badge: "MX", comingSoon: true },
 ];
 
 export default function ProfilePage() {
@@ -63,6 +93,16 @@ export default function ProfilePage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [passwordForm, setPasswordForm] = useState<PasswordFormState>(DEFAULT_PASSWORD_FORM);
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [connectedAccounts, setConnectedAccounts] = useState<BrokerAccount[]>([]);
+  const [loadingTrading, setLoadingTrading] = useState(false);
+  const [tradingError, setTradingError] = useState<string | null>(null);
+  const [showAddAccountCatalog, setShowAddAccountCatalog] = useState(false);
+
+  const deltaConnected = (brokerSnapshot?.balance?.broker || "").toLowerCase().includes("delta");
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -96,12 +136,35 @@ export default function ProfilePage() {
     }
 
     if (activeTab === "trading") {
+      setShowAddAccountCatalog(false);
+      setLoadingTrading(true);
+      setTradingError(null);
       void api
-        .get<BrokerAccountSnapshot>("/broker/account")
-        .then((response) => setBrokerSnapshot(response.data))
-        .catch(() => setBrokerSnapshot(null));
+        .get<BrokerAccount[]>("/broker/accounts")
+        .then(async (accountsResponse) => {
+          const accounts = accountsResponse.data;
+          setConnectedAccounts(accounts);
+
+          if (accounts.length > 0) {
+            try {
+              const snapshotResponse = await api.get<BrokerAccountSnapshot>("/broker/account");
+              setBrokerSnapshot(snapshotResponse.data);
+            } catch {
+              setBrokerSnapshot(null);
+            }
+          } else {
+            setBrokerSnapshot(null);
+          }
+        })
+        .catch(() => {
+          setConnectedAccounts([]);
+          setBrokerSnapshot(null);
+          setTradingError("Unable to load connected broker accounts.");
+        })
+        .finally(() => setLoadingTrading(false));
     }
   }, [activeTab, router]);
+
 
   const setTab = (tab: ActiveTab) => router.push(`/dashboard/profile?tab=${tab}`);
 
@@ -164,6 +227,46 @@ export default function ProfilePage() {
     }
   };
 
+  const updatePasswordField = <K extends keyof PasswordFormState>(field: K, value: PasswordFormState[K]) => {
+    setPasswordForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const resetPasswordForm = () => {
+    setPasswordForm(DEFAULT_PASSWORD_FORM);
+    setPasswordMessage(null);
+    setPasswordError(null);
+  };
+
+  const savePassword = async () => {
+    setPasswordMessage(null);
+    setPasswordError(null);
+
+    if (!passwordForm.current_password || !passwordForm.new_password || !passwordForm.confirm_password) {
+      setPasswordError("Please fill all password fields.");
+      return;
+    }
+
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      setPasswordError("New password and confirm password must match.");
+      return;
+    }
+
+    setUpdatingPassword(true);
+    try {
+      const response = await api.post<{ message: string }>("/auth/change-password", {
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+      });
+      setPasswordMessage(response.data.message || "Password updated successfully.");
+      setPasswordForm(DEFAULT_PASSWORD_FORM);
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail;
+      setPasswordError(typeof detail === "string" ? detail : "Failed to update password.");
+    } finally {
+      setUpdatingPassword(false);
+    }
+  };
+
   const brokerText = useMemo(() => {
     if (!brokerSnapshot?.balance) {
       return "No broker connected yet.";
@@ -174,6 +277,32 @@ export default function ProfilePage() {
     const broker = brokerSnapshot.balance.broker || "Connected Broker";
     return `${broker} | ${currency} ${balance}`;
   }, [brokerSnapshot]);
+
+  const totalBalanceLabel = useMemo(() => {
+    if (!brokerSnapshot?.balance) {
+      return "--";
+    }
+    const currency = brokerSnapshot.balance.currency || "USD";
+    const balance = brokerSnapshot.balance.balance ?? "--";
+    return `${currency} ${balance}`;
+  }, [brokerSnapshot]);
+
+  const openPositionsCount = brokerSnapshot?.positions?.length ?? 0;
+
+  const formatBrokerName = (value: string) => {
+    if (value.toLowerCase() === "delta") {
+      return "Delta Exchange";
+    }
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  };
+
+  const openAddAccountCatalog = () => {
+    setShowAddAccountCatalog(true);
+  };
+
+  const closeAddAccountCatalog = () => {
+    setShowAddAccountCatalog(false);
+  };
 
   return (
     <main className="min-h-screen bg-[#050607] text-[#E8ECEF]">
@@ -217,38 +346,6 @@ export default function ProfilePage() {
           <div className="rounded-2xl border border-[#1A1E23] bg-[#0A0D13] p-6">
             {activeTab === "profile" ? (
               <div className="space-y-6">
-                <div className="relative overflow-hidden rounded-2xl border border-[#1E2530] bg-[radial-gradient(circle_at_20%_20%,#183525_0%,#111a22_45%,#0D1118_100%)] p-5 sm:p-6">
-                  <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-[#9BFF00]/10 blur-3xl" />
-                  <div className="pointer-events-none absolute -left-16 bottom-0 h-32 w-32 rounded-full bg-[#3CD6A8]/10 blur-2xl" />
-
-                  <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#314152] bg-[#0E141B] text-2xl font-semibold text-[#DFF6E6]">
-                        {profileForm.full_name?.trim()?.charAt(0)?.toUpperCase() || "U"}
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-semibold text-[#F4F8FC]">Profile Studio</h2>
-                        <p className="mt-1 text-sm text-[#9CACBC]">Tune your identity, contact and trading persona in one place.</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                      <div className="rounded-xl border border-[#27303B] bg-[#0A1016]/80 px-3 py-2">
-                        <p className="text-[#AAB6C4]">Level</p>
-                        <p className="mt-1 font-semibold text-[#F3F7FB]">{profileForm.experience_level || "N/A"}</p>
-                      </div>
-                      <div className="rounded-xl border border-[#27303B] bg-[#0A1016]/80 px-3 py-2">
-                        <p className="text-[#AAB6C4]">Risk</p>
-                        <p className="mt-1 font-semibold text-[#F3F7FB]">Balanced</p>
-                      </div>
-                      <div className="rounded-xl border border-[#27303B] bg-[#0A1016]/80 px-3 py-2">
-                        <p className="text-[#AAB6C4]">Status</p>
-                        <p className="mt-1 font-semibold text-[#95FF45]">{profile?.is_active ? "Verified" : "Pending"}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 {loadingProfile ? (
                   <div className="rounded-xl border border-[#283240] bg-[#111822] px-4 py-3 text-sm text-[#9CB0C3]">Loading profile data...</div>
                 ) : null}
@@ -261,14 +358,12 @@ export default function ProfilePage() {
                   <div className="rounded-xl border border-[#31503A] bg-[#142419] px-4 py-3 text-sm text-[#AEE7B8]">{profileMessage}</div>
                 ) : null}
 
-                <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
-                  <div className="rounded-2xl border border-[#1E2530] bg-[#0C1117] p-5">
+                <div className="rounded-2xl border border-[#1E2530] bg-[#0C1117] p-5">
                     <div className="flex items-center justify-between border-b border-[#202A35] pb-4">
                       <div>
                         <h3 className="text-lg font-semibold text-[#F3F7FB]">Personal Information</h3>
                         <p className="mt-1 text-xs text-[#8B95A1]">This data appears across your dashboard and account reports.</p>
                       </div>
-                      <span className="rounded-full border border-[#334252] bg-[#111A23] px-3 py-1 text-xs text-[#A8EFC6]">Live Preview</span>
                     </div>
 
                     <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -357,57 +452,6 @@ export default function ProfilePage() {
                         />
                       </label>
                     </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="rounded-2xl border border-[#1E2530] bg-[#0C1117] p-4">
-                      <p className="text-sm font-medium text-[#E7EDF5]">Avatar & Visibility</p>
-                      <p className="mt-1 text-xs text-[#8591A0]">Control how your profile appears to followers.</p>
-
-                      <div className="mt-4 flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#334252] bg-[#131B24] text-lg font-semibold text-[#DFF6E6]">
-                          {(profileForm.full_name || "UG")
-                            .split(" ")
-                            .filter(Boolean)
-                            .slice(0, 2)
-                            .map((part) => part.charAt(0).toUpperCase())
-                            .join("") || "UG"}
-                        </div>
-                        <div className="flex gap-2">
-                          <button className="rounded-lg border border-[#344353] bg-[#121A23] px-3 py-1.5 text-xs text-[#C5CFDA] hover:bg-[#16212D]">Upload</button>
-                          <button className="rounded-lg border border-[#2E3640] bg-[#0E131A] px-3 py-1.5 text-xs text-[#8F9BA9] hover:bg-[#141B23]">Remove</button>
-                        </div>
-                      </div>
-
-                      <label className="mt-4 flex items-center justify-between rounded-xl border border-[#27303B] bg-[#10161F] px-3 py-2">
-                        <span className="text-xs text-[#AAB6C4]">Public profile visibility</span>
-                        <input
-                          type="checkbox"
-                          checked={profileForm.public_profile}
-                          onChange={(e) => updateProfileField("public_profile", e.target.checked)}
-                          className="h-4 w-4 accent-[#9BFF00]"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="rounded-2xl border border-[#1E2530] bg-[#0C1117] p-4">
-                      <p className="text-sm font-medium text-[#E7EDF5]">Quick Preferences</p>
-                      <div className="mt-3 space-y-2 text-xs text-[#9AA5B1]">
-                        <label className="flex items-center justify-between rounded-lg border border-[#25303A] bg-[#0F151D] px-3 py-2">
-                          Trade alerts on email
-                          <input type="checkbox" defaultChecked className="h-4 w-4 accent-[#9BFF00]" />
-                        </label>
-                        <label className="flex items-center justify-between rounded-lg border border-[#25303A] bg-[#0F151D] px-3 py-2">
-                          Weekly account summary
-                          <input type="checkbox" className="h-4 w-4 accent-[#9BFF00]" />
-                        </label>
-                        <label className="flex items-center justify-between rounded-lg border border-[#25303A] bg-[#0F151D] px-3 py-2">
-                          Strategy performance digest
-                          <input type="checkbox" defaultChecked className="h-4 w-4 accent-[#9BFF00]" />
-                        </label>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[#202A35] pt-4">
@@ -430,65 +474,110 @@ export default function ProfilePage() {
 
             {activeTab === "trading" ? (
               <div>
-                <h2 className="text-xl font-semibold text-[#F3F7FB]">Connect Your Trading Accounts</h2>
-                <p className="mt-2 text-sm text-[#8B95A1]">
-                  Manage all your accounts from a single dashboard. You can link up to 6 different accounts.
-                </p>
-
-                <div className="mt-4 rounded-xl border border-[#242C35] bg-[#0E141B] px-4 py-3">
-                  <p className="text-sm text-[#DDE4EC]">{brokerText}</p>
-                  <p className="mt-1 text-xs text-[#7E8A97]">Open Positions: {brokerSnapshot?.positions?.length ?? 0}</p>
-                </div>
-
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <button className="flex items-center gap-3 rounded-xl border border-[#2D3744] bg-[#101722] px-4 py-3 text-left hover:border-[#3A4A5E]">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#182535] text-xs font-semibold text-[#9BFF00]">D</span>
-                    <div>
-                      <p className="text-sm font-medium text-[#EEF4FA]">Delta Exchange</p>
-                      <p className="text-xs text-[#8B95A1]">Connected</p>
+                {showAddAccountCatalog ? (
+                  <div>
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <h2 className="text-3xl font-semibold text-[#F3F7FB]">Connect Your Trading Accounts</h2>
+                        <p className="mt-2 text-sm text-[#8B95A1]">Manage all your accounts from a single dashboard. You can link up to 8 different accounts.</p>
+                      </div>
+                      <button
+                        onClick={closeAddAccountCatalog}
+                        className="rounded-full border border-[#2A313A] bg-[#0B0F14] px-4 py-2 text-sm text-[#C1CBD8] hover:bg-[#10151D]"
+                      >
+                        Back
+                      </button>
                     </div>
-                  </button>
 
-                  <button className="flex items-center gap-3 rounded-xl border border-[#2A313A] bg-[#0B1118] px-4 py-3 text-left hover:border-[#3A4A5E]">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1E2A1F] text-xs font-semibold text-[#67E8A5]">C</span>
-                    <div>
-                      <p className="text-sm font-medium text-[#EEF4FA]">Coin Switch</p>
-                      <p className="text-xs text-[#8B95A1]">Ready to connect</p>
-                    </div>
-                  </button>
-
-                  <div className="flex items-center gap-3 rounded-xl border border-[#242C35] bg-[#0C1117] px-4 py-3 opacity-70">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1A2029] text-xs font-semibold text-[#64748B]">B</span>
-                    <div>
-                      <p className="text-sm font-medium text-[#9AA5B1]">Binance</p>
-                      <p className="text-xs text-[#667281]">Coming soon</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 rounded-xl border border-[#242C35] bg-[#0C1117] px-4 py-3 opacity-70">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1A2029] text-xs font-semibold text-[#64748B]">C</span>
-                    <div>
-                      <p className="text-sm font-medium text-[#9AA5B1]">CoinDCX</p>
-                      <p className="text-xs text-[#667281]">Coming soon</p>
+                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                      {BROKER_CATALOG.map((item) => (
+                        <button
+                          key={item.id}
+                          disabled={item.comingSoon}
+                          className={`flex items-center gap-3 rounded-2xl border px-4 py-4 text-left ${
+                            item.comingSoon
+                              ? "cursor-not-allowed border-[#242C35] bg-[#0C1117] opacity-60"
+                              : "border-[#2D3744] bg-[#101722] hover:border-[#3A4A5E]"
+                          }`}
+                        >
+                          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#27303A] bg-[#111822] text-xs font-semibold text-[#9BFF00]">
+                            {item.badge}
+                          </span>
+                          <div>
+                            <p className="text-lg font-semibold text-[#EEF4FA]">{item.name}</p>
+                            <p className="text-sm text-[#8B95A1]">{item.comingSoon ? "Coming soon" : "Tap to connect"}</p>
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   </div>
+                ) : (
+                  <>
+                    <h2 className="text-3xl font-semibold text-[#F3F7FB]">Connected Accounts</h2>
+                    <p className="mt-2 text-sm text-[#8B95A1]">Connect your exchanges and automate your trades seamlessly.</p>
 
-                  <div className="flex items-center gap-3 rounded-xl border border-[#242C35] bg-[#0C1117] px-4 py-3 opacity-70">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1A2029] text-xs font-semibold text-[#64748B]">M</span>
-                    <div>
-                      <p className="text-sm font-medium text-[#9AA5B1]">Mudrex</p>
-                      <p className="text-xs text-[#667281]">Coming soon</p>
+                    <div className="mt-6 flex items-center justify-end">
+                      <button
+                        onClick={openAddAccountCatalog}
+                        className="rounded-full bg-[#9BFF00] px-5 py-2 text-sm font-semibold text-[#11140D] hover:bg-[#B7FF45]"
+                      >
+                        + Add Account
+                      </button>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-3 rounded-xl border border-[#242C35] bg-[#0C1117] px-4 py-3 opacity-70">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1A2029] text-xs font-semibold text-[#64748B]">P</span>
-                    <div>
-                      <p className="text-sm font-medium text-[#9AA5B1]">Pi42</p>
-                      <p className="text-xs text-[#667281]">Coming soon</p>
+                    {loadingTrading && connectedAccounts.length === 0 ? (
+                      <div className="mt-4 rounded-xl border border-[#242C35] bg-[#0E141B] px-4 py-3 text-sm text-[#AAB4C0]">Loading connected accounts...</div>
+                    ) : null}
+
+                    {tradingError ? (
+                      <div className="mt-4 rounded-xl border border-[#4F2A2A] bg-[#2A1414] px-4 py-3 text-sm text-[#FFB4B4]">{tradingError}</div>
+                    ) : null}
+
+                    <div className="mt-6 divide-y divide-[#20262E] rounded-2xl border border-[#1E2530] bg-[#0C1117]">
+                      {connectedAccounts.length === 0 && !loadingTrading ? (
+                        <div className="px-5 py-8 text-sm text-[#93A0AD]">No connected accounts yet. Click Add Account to connect your broker.</div>
+                      ) : null}
+
+                      {connectedAccounts.map((account) => {
+                        const isDeltaRow = account.broker_name.toLowerCase() === "delta";
+                        const rowBalance = isDeltaRow ? totalBalanceLabel : "--";
+                        const rowPositions = isDeltaRow ? openPositionsCount : 0;
+
+                        return (
+                          <div key={account.id} className="flex flex-wrap items-center justify-between gap-4 px-5 py-5">
+                            <div className="flex items-center gap-4">
+                              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#27303A] bg-[#111822] text-sm font-semibold text-[#9BFF00]">
+                                {account.broker_name.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-xl font-semibold text-[#EEF4FA]">{formatBrokerName(account.broker_name)}</p>
+                                <p className="mt-0.5 text-sm text-[#8B95A1]">Client ID: {account.display_client_id || "XXXXXX"}</p>
+                                <p className="mt-0.5 text-xs text-[#6F7A87]">{rowPositions} open positions</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <p className="text-2xl font-semibold text-[#F3F7FB]">{rowBalance}</p>
+                              <button className="rounded-full border border-[#2A313A] p-2 text-[#AAB4C0] hover:bg-[#10151D]" aria-label="Remove account">
+                                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M3 6h18" />
+                                  <path d="M8 6V4h8v2" />
+                                  <path d="M8 10v8" />
+                                  <path d="M12 10v8" />
+                                  <path d="M16 10v8" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
-                </div>
+
+                    {deltaConnected ? (
+                      <p className="mt-4 text-xs text-[#7E8A97]">{brokerText}</p>
+                    ) : null}
+                  </>
+                )}
               </div>
             ) : null}
 
@@ -497,24 +586,58 @@ export default function ProfilePage() {
                 <h2 className="text-xl font-semibold text-[#F3F7FB]">Password Reset</h2>
                 <p className="mt-2 text-sm text-[#8B95A1]">Change your password securely.</p>
 
+                {passwordError ? (
+                  <div className="mt-4 rounded-xl border border-[#4F2A2A] bg-[#2A1414] px-4 py-3 text-sm text-[#FFB4B4]">{passwordError}</div>
+                ) : null}
+
+                {passwordMessage ? (
+                  <div className="mt-4 rounded-xl border border-[#31503A] bg-[#142419] px-4 py-3 text-sm text-[#AEE7B8]">{passwordMessage}</div>
+                ) : null}
+
                 <div className="mt-6 space-y-4">
                   <label className="block text-sm text-[#9AA5B1]">
                     Current Password
-                    <input type="password" className="mt-1 w-full rounded-lg border border-[#242C35] bg-[#0E141B] px-3 py-2 text-[#E8ECEF]" />
+                    <input
+                      type="password"
+                      value={passwordForm.current_password}
+                      onChange={(e) => updatePasswordField("current_password", e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-[#242C35] bg-[#0E141B] px-3 py-2 text-[#E8ECEF]"
+                    />
                   </label>
                   <label className="block text-sm text-[#9AA5B1]">
                     New Password
-                    <input type="password" className="mt-1 w-full rounded-lg border border-[#242C35] bg-[#0E141B] px-3 py-2 text-[#E8ECEF]" />
+                    <input
+                      type="password"
+                      value={passwordForm.new_password}
+                      onChange={(e) => updatePasswordField("new_password", e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-[#242C35] bg-[#0E141B] px-3 py-2 text-[#E8ECEF]"
+                    />
                   </label>
                   <label className="block text-sm text-[#9AA5B1]">
                     Confirm Password
-                    <input type="password" className="mt-1 w-full rounded-lg border border-[#242C35] bg-[#0E141B] px-3 py-2 text-[#E8ECEF]" />
+                    <input
+                      type="password"
+                      value={passwordForm.confirm_password}
+                      onChange={(e) => updatePasswordField("confirm_password", e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-[#242C35] bg-[#0E141B] px-3 py-2 text-[#E8ECEF]"
+                    />
                   </label>
                 </div>
 
                 <div className="mt-6 flex justify-end gap-2">
-                  <button className="rounded-lg border border-[#2A313A] bg-[#0B0F14] px-4 py-2 text-sm text-[#C1CBD8] hover:bg-[#10151D]">Reset</button>
-                  <button className="rounded-lg bg-[#9BFF00] px-5 py-2 font-semibold text-[#11140D] hover:bg-[#B7FF45]">Update Password</button>
+                  <button
+                    onClick={resetPasswordForm}
+                    className="rounded-lg border border-[#2A313A] bg-[#0B0F14] px-4 py-2 text-sm text-[#C1CBD8] hover:bg-[#10151D]"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    onClick={savePassword}
+                    disabled={updatingPassword}
+                    className="rounded-lg bg-[#9BFF00] px-5 py-2 font-semibold text-[#11140D] hover:bg-[#B7FF45] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {updatingPassword ? "Updating..." : "Update Password"}
+                  </button>
                 </div>
               </div>
             ) : null}

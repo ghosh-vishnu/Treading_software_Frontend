@@ -30,8 +30,9 @@ export function BrokerConnectCard({ onConnected }: Props) {
       });
       onConnected(data);
       setMessage("Broker connected successfully.");
-    } catch {
-      setMessage("Broker connection failed. Check credentials and try again.");
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail;
+      setMessage(typeof detail === "string" ? detail : "Broker connection failed. Check credentials and try again.");
     } finally {
       setLoading(false);
     }
