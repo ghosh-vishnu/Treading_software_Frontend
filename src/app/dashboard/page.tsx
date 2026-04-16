@@ -34,6 +34,11 @@ export default function DashboardPage() {
       setSummary(summaryRes.data);
       setTrades(tradesRes.data);
       setOverview(overviewRes.data);
+    } catch (error: any) {
+      if (error?.response?.status === 401) {
+        clearTokens();
+        router.push("/login");
+      }
     } finally {
       setLoading(false);
     }

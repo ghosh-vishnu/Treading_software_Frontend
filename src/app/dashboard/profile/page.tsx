@@ -43,6 +43,12 @@ type BrokerCatalogItem = {
   comingSoon?: boolean;
 };
 
+type BrokerConnectFormState = {
+  api_key: string;
+  api_secret: string;
+  passphrase: string;
+};
+
 const DEFAULT_PROFILE_FORM: ProfileFormState = {
   full_name: "",
   username: "",
@@ -68,15 +74,23 @@ const TAB_LABELS: Array<{ key: ActiveTab; label: string }> = [
 ];
 
 const BROKER_CATALOG: BrokerCatalogItem[] = [
-  { id: "coinswitch", name: "CoinSwitch", badge: "CS" },
-  { id: "shark", name: "Shark", badge: "SH" },
-  { id: "cryptx", name: "Cryptx", badge: "CX" },
-  { id: "bybit", name: "ByBit", badge: "BB" },
+  { id: "delta", name: "Delta Exchange", badge: "DE" },
+  { id: "zerodha", name: "Zerodha", badge: "ZE", comingSoon: true },
+  { id: "coinswitch", name: "CoinSwitch", badge: "CS", comingSoon: true },
+  { id: "shark", name: "Shark", badge: "SH", comingSoon: true },
+  { id: "cryptx", name: "Cryptx", badge: "CX", comingSoon: true },
+  { id: "bybit", name: "ByBit", badge: "BB", comingSoon: true },
   { id: "pi42", name: "Pi42", badge: "P4", comingSoon: true },
   { id: "binance", name: "Binance", badge: "BN", comingSoon: true },
   { id: "coindcx", name: "CoinDCX", badge: "CD", comingSoon: true },
   { id: "mudrex", name: "Mudrex", badge: "MX", comingSoon: true },
 ];
+
+const DEFAULT_BROKER_CONNECT_FORM: BrokerConnectFormState = {
+  api_key: "",
+  api_secret: "",
+  passphrase: "",
+};
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -103,6 +117,9 @@ export default function ProfilePage() {
   const [tradingMessage, setTradingMessage] = useState<string | null>(null);
   const [removingAccountId, setRemovingAccountId] = useState<number | null>(null);
   const [showAddAccountCatalog, setShowAddAccountCatalog] = useState(false);
+  const [selectedBrokerForConnect, setSelectedBrokerForConnect] = useState<BrokerCatalogItem | null>(null);
+  const [brokerConnectForm, setBrokerConnectForm] = useState<BrokerConnectFormState>(DEFAULT_BROKER_CONNECT_FORM);
+  const [connectingBroker, setConnectingBroker] = useState(false);
 
   const deltaConnected = (brokerSnapshot?.balance?.broker || "").toLowerCase().includes("delta");
 
@@ -139,6 +156,8 @@ export default function ProfilePage() {
 
     if (activeTab === "trading") {
       setShowAddAccountCatalog(false);
+      setSelectedBrokerForConnect(null);
+      setBrokerConnectForm(DEFAULT_BROKER_CONNECT_FORM);
       setLoadingTrading(true);
       setTradingError(null);
       setTradingMessage(null);
@@ -292,6 +311,30 @@ export default function ProfilePage() {
 
   const openPositionsCount = brokerSnapshot?.positions?.length ?? 0;
 
+  const connectedBrokerIds = useMemo(() => {
+    return new Set(connectedAccounts.map((account) => account.broker_name.toLowerCase()));
+  }, [connectedAccounts]);
+
+  const availableBrokerCatalog = useMemo(() => {
+    return BROKER_CATALOG.filter((item) => !connectedBrokerIds.has(item.id));
+  }, [connectedBrokerIds]);
+
+  const shouldShowCatalog = connectedAccounts.length === 0 || showAddAccountCatalog;
+
+  const canAddMoreAccounts = availableBrokerCatalog.length > 0;
+  const ipWhitelistHintIp = useMemo(() => {
+    if (!tradingError) {
+      return null;
+    }
+
+    if (!tradingError.toLowerCase().includes("ip whitelist")) {
+      return null;
+    }
+
+    const match = tradingError.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/);
+    return match ? match[0] : null;
+  }, [tradingError]);
+
   const formatBrokerName = (value: string) => {
     if (value.toLowerCase() === "delta") {
       return "Delta Exchange";
@@ -300,11 +343,87 @@ export default function ProfilePage() {
   };
 
   const openAddAccountCatalog = () => {
+    if (!canAddMoreAccounts) {
+      return;
+    }
+    setSelectedBrokerForConnect(null);
+    setBrokerConnectForm(DEFAULT_BROKER_CONNECT_FORM);
     setShowAddAccountCatalog(true);
   };
 
   const closeAddAccountCatalog = () => {
+    setSelectedBrokerForConnect(null);
+    setBrokerConnectForm(DEFAULT_BROKER_CONNECT_FORM);
     setShowAddAccountCatalog(false);
+  };
+
+  const openBrokerConnect = (item: BrokerCatalogItem) => {
+    if (item.comingSoon) {
+      return;
+    }
+
+    setTradingError(null);
+    setTradingMessage(null);
+    setSelectedBrokerForConnect(item);
+    setBrokerConnectForm(DEFAULT_BROKER_CONNECT_FORM);
+  };
+
+  const closeBrokerConnect = () => {
+    setSelectedBrokerForConnect(null);
+    setBrokerConnectForm(DEFAULT_BROKER_CONNECT_FORM);
+  };
+
+  const updateBrokerConnectField = <K extends keyof BrokerConnectFormState>(field: K, value: BrokerConnectFormState[K]) => {
+    setBrokerConnectForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const connectSelectedBroker = async () => {
+    if (!selectedBrokerForConnect) {
+      return;
+    }
+
+    if (selectedBrokerForConnect.id !== "delta") {
+      setTradingError("Only Delta Exchange is available right now.");
+      return;
+    }
+
+    if (!brokerConnectForm.api_key.trim() || !brokerConnectForm.api_secret.trim()) {
+      setTradingError("API key and secret key are required.");
+      return;
+    }
+
+    setConnectingBroker(true);
+    setTradingError(null);
+    setTradingMessage(null);
+
+    try {
+      const response = await api.post<BrokerAccount>("/broker/connect", {
+        broker_name: selectedBrokerForConnect.id,
+        api_key: brokerConnectForm.api_key.trim(),
+        api_secret: brokerConnectForm.api_secret.trim(),
+        passphrase: brokerConnectForm.passphrase.trim() || null,
+      });
+
+      const nextAccounts = [...connectedAccounts, response.data];
+      setConnectedAccounts(nextAccounts);
+      setShowAddAccountCatalog(false);
+      setSelectedBrokerForConnect(null);
+      setBrokerConnectForm(DEFAULT_BROKER_CONNECT_FORM);
+
+      try {
+        const snapshotResponse = await api.get<BrokerAccountSnapshot>("/broker/account");
+        setBrokerSnapshot(snapshotResponse.data);
+      } catch {
+        setBrokerSnapshot(null);
+      }
+
+      setTradingMessage("Broker account connected successfully.");
+    } catch (error: any) {
+      const detail = error?.response?.data?.detail;
+      setTradingError(typeof detail === "string" ? detail : "Failed to connect broker account.");
+    } finally {
+      setConnectingBroker(false);
+    }
   };
 
   const removeAccount = async (account: BrokerAccount) => {
@@ -510,56 +629,149 @@ export default function ProfilePage() {
 
             {activeTab === "trading" ? (
               <div>
-                {showAddAccountCatalog ? (
+                {selectedBrokerForConnect ? (
                   <div>
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
-                        <h2 className="text-3xl font-semibold text-[#F3F7FB]">Connect Your Trading Accounts</h2>
-                        <p className="mt-2 text-sm text-[#8B95A1]">Manage all your accounts from a single dashboard. You can link up to 8 different accounts.</p>
+                        <h2 className="text-3xl font-semibold text-[#F3F7FB]">Connect Your Trading Account</h2>
+                        <p className="mt-2 text-sm text-[#8B95A1]">Only Delta Exchange is available for API connection right now.</p>
                       </div>
-                      <button
-                        onClick={closeAddAccountCatalog}
-                        className="rounded-full border border-[#2A313A] bg-[#0B0F14] px-4 py-2 text-sm text-[#C1CBD8] hover:bg-[#10151D]"
-                      >
-                        Back
-                      </button>
                     </div>
 
-                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                      {BROKER_CATALOG.map((item) => (
+                    {tradingError ? (
+                      <div className="mt-4 rounded-xl border border-[#4F2A2A] bg-[#2A1414] px-4 py-3 text-sm text-[#FFB4B4]">{tradingError}</div>
+                    ) : null}
+
+                    {ipWhitelistHintIp ? (
+                      <div className="mt-4 rounded-xl border border-[#4C4622] bg-[#27230F] px-4 py-3 text-sm text-[#F5E7A1]">
+                        <p className="font-semibold text-[#FFF2B8]">Delta whitelist action required</p>
+                        <p className="mt-1">Go to Delta API settings and whitelist this IP:</p>
+                        <p className="mt-1 font-mono text-base text-[#F9F0CC]">{ipWhitelistHintIp}</p>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-6 rounded-2xl border border-[#1E2530] bg-[#0C1117] p-5">
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.12em] text-[#7D8894]">Selected Broker</p>
+                          <p className="mt-1 text-base font-semibold text-[#EEF4FA]">{selectedBrokerForConnect.name}</p>
+                        </div>
+
+                        <label className="block text-sm text-[#9AA5B1]">
+                          API Key
+                          <input
+                            value={brokerConnectForm.api_key}
+                            onChange={(e) => updateBrokerConnectField("api_key", e.target.value)}
+                            className="mt-1.5 w-full rounded-xl border border-[#26303B] bg-[#0E141B] px-3 py-2.5 text-[#E8ECEF] placeholder:text-[#5E6A78] focus:border-[#3A4A5C] focus:outline-none"
+                            placeholder="Enter API key"
+                          />
+                        </label>
+
+                        <label className="block text-sm text-[#9AA5B1]">
+                          Secret Key
+                          <input
+                            value={brokerConnectForm.api_secret}
+                            onChange={(e) => updateBrokerConnectField("api_secret", e.target.value)}
+                            className="mt-1.5 w-full rounded-xl border border-[#26303B] bg-[#0E141B] px-3 py-2.5 text-[#E8ECEF] placeholder:text-[#5E6A78] focus:border-[#3A4A5C] focus:outline-none"
+                            placeholder="Enter secret key"
+                          />
+                        </label>
+
+                        <label className="block text-sm text-[#9AA5B1]">
+                          Passphrase (Optional)
+                          <input
+                            value={brokerConnectForm.passphrase}
+                            onChange={(e) => updateBrokerConnectField("passphrase", e.target.value)}
+                            className="mt-1.5 w-full rounded-xl border border-[#26303B] bg-[#0E141B] px-3 py-2.5 text-[#E8ECEF] placeholder:text-[#5E6A78] focus:border-[#3A4A5C] focus:outline-none"
+                            placeholder="Enter passphrase if required"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-6 flex flex-wrap justify-end gap-3">
                         <button
-                          key={item.id}
-                          disabled={item.comingSoon}
-                          className={`flex items-center gap-3 rounded-2xl border px-4 py-4 text-left ${
-                            item.comingSoon
-                              ? "cursor-not-allowed border-[#242C35] bg-[#0C1117] opacity-60"
-                              : "border-[#2D3744] bg-[#101722] hover:border-[#3A4A5E]"
-                          }`}
+                          onClick={closeBrokerConnect}
+                          className="rounded-lg border border-[#2A313A] bg-[#0B0F14] px-4 py-2 text-sm text-[#C1CBD8] hover:bg-[#10151D]"
                         >
-                          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#27303A] bg-[#111822] text-xs font-semibold text-[#9BFF00]">
-                            {item.badge}
-                          </span>
-                          <div>
-                            <p className="text-lg font-semibold text-[#EEF4FA]">{item.name}</p>
-                            <p className="text-sm text-[#8B95A1]">{item.comingSoon ? "Coming soon" : "Tap to connect"}</p>
-                          </div>
+                          Back
                         </button>
-                      ))}
+                        <button
+                          onClick={() => void connectSelectedBroker()}
+                          disabled={connectingBroker}
+                          className="rounded-lg bg-[#9BFF00] px-5 py-2 font-semibold text-[#11140D] hover:bg-[#B7FF45] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {connectingBroker ? "Connecting..." : "Connect"}
+                        </button>
+                      </div>
                     </div>
+                  </div>
+                ) : shouldShowCatalog ? (
+                  <div>
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <h2 className="text-3xl font-semibold text-[#F3F7FB]">
+                          {connectedAccounts.length === 0 ? "Connect Your Trading Accounts" : "Add Trading Account"}
+                        </h2>
+                        <p className="mt-2 text-sm text-[#8B95A1]">
+                          {connectedAccounts.length === 0
+                            ? "Manage all your accounts from a single dashboard. You can link up to 8 different accounts."
+                            : "Only brokers not already connected are listed below."}
+                        </p>
+                      </div>
+                      {connectedAccounts.length > 0 ? (
+                        <button
+                          onClick={closeAddAccountCatalog}
+                          className="rounded-full border border-[#2A313A] bg-[#0B0F14] px-4 py-2 text-sm text-[#C1CBD8] hover:bg-[#10151D]"
+                        >
+                          Back
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {availableBrokerCatalog.length > 0 ? (
+                      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                        {availableBrokerCatalog.map((item) => (
+                          <button
+                            key={item.id}
+                            disabled={item.comingSoon}
+                            onClick={() => openBrokerConnect(item)}
+                            className={`flex items-center gap-3 rounded-2xl border px-4 py-4 text-left ${
+                              item.comingSoon
+                                ? "cursor-not-allowed border-[#242C35] bg-[#0C1117] opacity-60"
+                                : "border-[#2D3744] bg-[#101722] hover:border-[#3A4A5E]"
+                            }`}
+                          >
+                            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#27303A] bg-[#111822] text-xs font-semibold text-[#9BFF00]">
+                              {item.badge}
+                            </span>
+                            <div>
+                              <p className="text-lg font-semibold text-[#EEF4FA]">{item.name}</p>
+                              <p className="text-sm text-[#8B95A1]">{item.comingSoon ? "Coming soon" : "Tap to connect"}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-6 rounded-xl border border-[#242C35] bg-[#0E141B] px-4 py-3 text-sm text-[#AAB4C0]">
+                        All listed brokers are already connected.
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <>
                     <h2 className="text-3xl font-semibold text-[#F3F7FB]">Connected Accounts</h2>
                     <p className="mt-2 text-sm text-[#8B95A1]">Connect your exchanges and automate your trades seamlessly.</p>
 
-                    <div className="mt-6 flex items-center justify-end">
-                      <button
-                        onClick={openAddAccountCatalog}
-                        className="rounded-full bg-[#9BFF00] px-5 py-2 text-sm font-semibold text-[#11140D] hover:bg-[#B7FF45]"
-                      >
-                        + Add Account
-                      </button>
-                    </div>
+                    {canAddMoreAccounts ? (
+                      <div className="mt-6 flex items-center justify-end">
+                        <button
+                          onClick={openAddAccountCatalog}
+                          className="rounded-full bg-[#9BFF00] px-5 py-2 text-sm font-semibold text-[#11140D] hover:bg-[#B7FF45]"
+                        >
+                          + Add Account
+                        </button>
+                      </div>
+                    ) : null}
 
                     {loadingTrading && connectedAccounts.length === 0 ? (
                       <div className="mt-4 rounded-xl border border-[#242C35] bg-[#0E141B] px-4 py-3 text-sm text-[#AAB4C0]">Loading connected accounts...</div>

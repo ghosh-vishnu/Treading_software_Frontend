@@ -35,6 +35,10 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    if (!originalRequest) {
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -59,6 +63,11 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         clearTokens();
+
+        if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+          window.location.replace("/login");
+        }
+
         return Promise.reject(refreshError);
       }
     }
