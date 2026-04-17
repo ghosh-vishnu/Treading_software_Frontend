@@ -21,7 +21,7 @@ export default function LoginPage() {
     try {
       const { data } = await api.post("/auth/login", { email, password });
       setTokens(data.tokens.access_token, data.tokens.refresh_token);
-      router.push("/dashboard");
+      router.replace(data.user.role === "admin" ? "/admin" : "/dashboard");
     } catch {
       setError("Invalid credentials. Please try again.");
     } finally {

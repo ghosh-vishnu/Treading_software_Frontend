@@ -11,7 +11,6 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"user" | "admin">("user");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -43,7 +42,6 @@ export default function RegisterPage() {
         full_name: fullName,
         email,
         password,
-        role,
       });
       setTokens(data.tokens.access_token, data.tokens.refresh_token);
       router.push("/dashboard");
@@ -104,14 +102,6 @@ export default function RegisterPage() {
             minLength={8}
             required
           />
-          <select
-            className="w-full rounded-lg border border-[#242C35] bg-[#0E141B] px-4 py-3 text-[#E8ECEF] outline-none ring-[#9BFF00]/30 focus:ring"
-            value={role}
-            onChange={(e) => setRole(e.target.value as "user" | "admin")}
-          >
-            <option value="user">User</option>
-            <option value="admin">Admin</option>
-          </select>
           {passwordError && password ? (
             <p className="text-sm text-red-400">{passwordError}</p>
           ) : null}

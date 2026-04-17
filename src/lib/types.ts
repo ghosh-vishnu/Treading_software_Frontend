@@ -94,6 +94,45 @@ export type StrategySignalRequest = {
   order_type: "MARKET" | "LIMIT";
 };
 
+export type StrategyCard = {
+  id: number;
+  name: string;
+  description: string | null;
+  user_id: number;
+  strategy_tag: string;
+  is_public: boolean;
+  exchange: string;
+  followers: number;
+  recommended_margin: string;
+  mdd_percent: string;
+  win_rate_percent: string;
+  pnl: string;
+  roi_percent: string;
+  chart_points: string | null;
+  academy_slugs: string | null;
+  is_featured: boolean;
+  created_at: string;
+};
+
+export type AdminStrategyCreateRequest = {
+  name: string;
+  description: string | null;
+  strategy_tag: string;
+  exchange: string;
+  followers: number;
+  recommended_margin: string;
+  mdd_percent: string;
+  win_rate_percent: string;
+  pnl: string;
+  roi_percent: string;
+  chart_points: string[];
+  academy_slugs: string[];
+  is_public: boolean;
+  is_featured: boolean;
+};
+
+export type AdminStrategyUpdateRequest = Partial<AdminStrategyCreateRequest>;
+
 export type CopyLeaderStats = {
   leader_id: number;
   followers: number;
@@ -164,6 +203,8 @@ export type AcademyArticleCreateRequest = {
   is_published: boolean;
 };
 
+export type AcademyArticleUpdateRequest = Partial<AcademyArticleCreateRequest>;
+
 export type BacktestRun = {
   id: number;
   user_id: number;
@@ -200,4 +241,16 @@ export type CreateNotificationRequest = {
   category: string;
   title: string;
   message: string;
+};
+
+export type AdminDashboardSummary = {
+  total_customers: number;
+  active_customers: number;
+  total_admins: number;
+  total_strategies: number;
+  public_strategies: number;
+  total_academy_articles: number;
+  published_academy_articles: number;
+  total_trades: number;
+  open_trades: number;
 };

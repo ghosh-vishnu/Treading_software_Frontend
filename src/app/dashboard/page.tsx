@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [brokerBalance, setBrokerBalance] = useState<BrokerBalance | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [displayName, setDisplayName] = useState("Trader");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadData = async () => {
     try {
@@ -58,9 +59,15 @@ export default function DashboardPage() {
       const profileRes = await api.get<UserProfile>("/auth/me");
       const fullName = profileRes.data.full_name?.trim();
 
+      if (profileRes.data.role === "admin") {
+        router.replace("/admin");
+        return;
+      }
+
       if (fullName) {
         setDisplayName(fullName);
       }
+      setIsAdmin(false);
     } catch {
       // Keep fallback name when profile endpoint is unavailable.
     }
@@ -135,6 +142,7 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#141B23] pb-4">
             <nav className="flex items-center gap-5 text-sm">
               <button className="font-semibold text-[#F7FAFD]">Dashboard</button>
+              <button onClick={() => router.push("/dashboard/strategies")} className="text-[#8D98A5] hover:text-[#DEE6EE]">Strategies</button>
               <button onClick={() => router.push("/dashboard/academy")} className="text-[#8D98A5] hover:text-[#DEE6EE]">Academy</button>
               <button onClick={() => router.push("/dashboard/backtesting")} className="text-[#8D98A5] hover:text-[#DEE6EE]">Backtesting</button>
               <button onClick={() => router.push("/dashboard/notifications")} className="text-[#8D98A5] hover:text-[#DEE6EE]">Notifications</button>
