@@ -102,6 +102,10 @@ export type StrategyCard = {
   strategy_tag: string;
   is_public: boolean;
   exchange: string;
+  risk_level: "low" | "medium" | "high";
+  logo_url: string | null;
+  image_url: string | null;
+  tags: string | null;
   followers: number;
   recommended_margin: string;
   mdd_percent: string;
@@ -119,6 +123,10 @@ export type AdminStrategyCreateRequest = {
   description: string | null;
   strategy_tag: string;
   exchange: string;
+  risk_level: "low" | "medium" | "high";
+  logo_url: string | null;
+  image_url: string | null;
+  tags: string[];
   followers: number;
   recommended_margin: string;
   mdd_percent: string;
@@ -253,4 +261,115 @@ export type AdminDashboardSummary = {
   published_academy_articles: number;
   total_trades: number;
   open_trades: number;
+};
+
+export type AdminDashboardMetrics = {
+  total_users: number;
+  active_traders: number;
+  total_strategies: number;
+  trades_today: number;
+  revenue: string;
+  profit_share: string;
+  total_followers: number;
+  total_subscriptions: number;
+};
+
+export type ChartPoint = {
+  label: string;
+  value: string;
+};
+
+export type ActivityItem = {
+  id: string;
+  category: string;
+  title: string;
+  detail: string;
+  created_at: string;
+};
+
+export type PagedMeta = {
+  page: number;
+  page_size: number;
+  total: number;
+};
+
+export type AdminUserItem = {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  kyc_status: "pending" | "approved" | "rejected";
+  subscription_status: "active" | "inactive" | "cancelled";
+  linked_exchange_accounts: number;
+  followers: number;
+  wallet_balance: string;
+  created_at: string;
+};
+
+export type AdminUserListResponse = {
+  meta: PagedMeta;
+  items: AdminUserItem[];
+};
+
+export type AdminTradeItem = {
+  id: number;
+  user_id: number;
+  symbol: string;
+  side: string;
+  quantity: string;
+  price: string;
+  order_type: string;
+  status: string;
+  pnl: string;
+  broker: string;
+  strategy_tag: string | null;
+  created_at: string;
+};
+
+export type AdminTradeListResponse = {
+  meta: PagedMeta;
+  items: AdminTradeItem[];
+};
+
+export type StrategyPerformance = {
+  equity_curve: ChartPoint[];
+  daily_returns: ChartPoint[];
+  monthly_returns: ChartPoint[];
+  drawdown_curve: ChartPoint[];
+  win_loss_ratio: string;
+  average_rr: string;
+  open_positions: number;
+};
+
+export type PlatformSettings = {
+  id: number;
+  site_name: string;
+  support_email: string;
+  fee_percent: number;
+  profit_share_percent: number;
+  maintenance_mode: boolean;
+  telegram_alerts_enabled: boolean;
+  telegram_chat_id: string | null;
+  exchange_api_key: string | null;
+  exchange_api_secret: string | null;
+  updated_at: string;
+};
+
+export type PlatformSettingsUpdateRequest = Omit<PlatformSettings, "id" | "updated_at">;
+
+export type AuditLogItem = {
+  id: number;
+  actor_user_id: number | null;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  severity: "info" | "warning" | "error";
+  metadata_json: string | null;
+  created_at: string;
+};
+
+export type AuditLogListResponse = {
+  meta: PagedMeta;
+  items: AuditLogItem[];
 };
