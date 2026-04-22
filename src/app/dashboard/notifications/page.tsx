@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
+import { extractApiErrorMessage } from "@/lib/errors";
 import type { AppNotification, CreateNotificationRequest } from "@/lib/types";
 
 const DEFAULT_FORM: CreateNotificationRequest = {
@@ -56,8 +57,8 @@ export default function NotificationsPage() {
       setItems((current) => [res.data, ...current]);
       setMessage("Notification created.");
       setForm(DEFAULT_FORM);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to create notification.");
+    } catch (err: unknown) {
+      setError(extractApiErrorMessage(err, "Failed to create notification."));
     } finally {
       setSaving(false);
     }
@@ -71,8 +72,8 @@ export default function NotificationsPage() {
       await api.post("/notifications/mark-all-read");
       await loadNotifications();
       setMessage("All notifications marked as read.");
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to mark all read.");
+    } catch (err: unknown) {
+      setError(extractApiErrorMessage(err, "Failed to mark all read."));
     } finally {
       setSaving(false);
     }

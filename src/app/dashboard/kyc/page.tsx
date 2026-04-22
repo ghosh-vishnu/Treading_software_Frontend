@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
+import { extractApiErrorMessage } from "@/lib/errors";
 import type { KYCRecord, KYCSubmitRequest } from "@/lib/types";
 
 const DEFAULT_FORM: KYCSubmitRequest = {
@@ -55,8 +56,8 @@ export default function KYCPage() {
       const res = await api.post<KYCRecord>("/kyc/submit", form);
       setKyc(res.data);
       setMessage("KYC submitted successfully.");
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "KYC submit failed.");
+    } catch (err: unknown) {
+      setError(extractApiErrorMessage(err, "KYC submit failed."));
     } finally {
       setSaving(false);
     }

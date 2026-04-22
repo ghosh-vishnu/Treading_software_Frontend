@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 
 import { api } from "@/lib/api";
+import { extractApiErrorMessage } from "@/lib/errors";
 import type { BrokerAccount } from "@/lib/types";
 
 type Props = {
@@ -30,9 +31,8 @@ export function BrokerConnectCard({ onConnected }: Props) {
       });
       onConnected(data);
       setMessage("Broker connected successfully.");
-    } catch (error: any) {
-      const detail = error?.response?.data?.detail;
-      setMessage(typeof detail === "string" ? detail : "Broker connection failed. Check credentials and try again.");
+    } catch (error: unknown) {
+      setMessage(extractApiErrorMessage(error, "Broker connection failed. Check credentials and try again."));
     } finally {
       setLoading(false);
     }

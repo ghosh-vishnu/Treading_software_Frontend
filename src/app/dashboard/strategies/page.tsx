@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
+import { extractApiErrorMessage } from "@/lib/errors";
 import type { StrategyCard, UserProfile } from "@/lib/types";
 
 function parseSeries(points: string | null): number[] {
@@ -60,13 +61,17 @@ export default function StrategiesPage() {
         return;
       }
       setStrategies(strategiesRes.data);
-    } catch (err: any) {
-      if (err?.response?.status === 401) {
+    } catch (err: unknown) {
+      const status =
+        typeof err === "object" && err && "response" in err
+          ? ((err as { response?: { status?: unknown } }).response?.status as number | undefined)
+          : undefined;
+      if (status === 401) {
         clearTokens();
         router.push("/login");
         return;
       }
-      setError("Unable to load strategy catalog.");
+      setError(extractApiErrorMessage(err, "Unable to load strategy catalog."));
     } finally {
       setLoading(false);
     }

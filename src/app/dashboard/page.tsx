@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
+import { extractApiErrorMessage } from "@/lib/errors";
 import type { BrokerBalance, DashboardOverview, DashboardSummary, Trade, UserProfile } from "@/lib/types";
 
 const initialSummary: DashboardSummary = {
@@ -23,7 +24,6 @@ export default function DashboardPage() {
   const [brokerBalance, setBrokerBalance] = useState<BrokerBalance | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [displayName, setDisplayName] = useState("Trader");
-  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadData = async () => {
     try {
@@ -35,11 +35,18 @@ export default function DashboardPage() {
       setSummary(summaryRes.data);
       setTrades(tradesRes.data);
       setOverview(overviewRes.data);
-    } catch (error: any) {
-      if (error?.response?.status === 401) {
+    } catch (error: unknown) {
+      const status =
+        typeof error === "object" && error && "response" in error
+          ? ((error as { response?: { status?: unknown } }).response?.status as number | undefined)
+          : undefined;
+      if (status === 401) {
         clearTokens();
         router.push("/login");
+        return;
       }
+      // Optional: keep stale UI, but surface generic message if needed.
+      extractApiErrorMessage(error, "");
     } finally {
       setLoading(false);
     }
@@ -67,7 +74,6 @@ export default function DashboardPage() {
       if (fullName) {
         setDisplayName(fullName);
       }
-      setIsAdmin(false);
     } catch {
       // Keep fallback name when profile endpoint is unavailable.
     }
@@ -283,7 +289,7 @@ export default function DashboardPage() {
               </div>
 
               <aside className="rounded-2xl border border-[#1A212A] bg-[#070A10] p-4">
-                <p className="mt-24 text-center text-sm text-[#95A2B1]">You haven't mirrored any strategies yet</p>
+                <p className="mt-24 text-center text-sm text-[#95A2B1]">You haven&apos;t mirrored any strategies yet</p>
                 <button className="mx-auto mt-4 block rounded-full bg-[#9BFF00] px-5 py-2 text-sm font-semibold text-[#11140D] hover:bg-[#B7FF45]">
                   Explore Strategies
                 </button>

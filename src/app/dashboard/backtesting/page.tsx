@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
+import { extractApiErrorMessage } from "@/lib/errors";
 import type { BacktestRun, BacktestRunRequest } from "@/lib/types";
 
 const DEFAULT_REQUEST: BacktestRunRequest = {
@@ -39,16 +40,24 @@ export default function BacktestingPage() {
     try {
       const res = await api.post<BacktestRun>("/backtesting/run", form);
       setResult(res.data);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Backtest failed.");
+    } catch (err: unknown) {
+      setError(extractApiErrorMessage(err, "Backtest failed."));
     } finally {
       setRunning(false);
     }
   };
 
-  let report: any = null;
+  type BacktestReport = { wins: number; losses: number; final_capital: number | string };
+  const isBacktestReport = (value: unknown): value is BacktestReport => {
+    if (!value || typeof value !== "object") return false;
+    const v = value as Record<string, unknown>;
+    return typeof v.wins === "number" && typeof v.losses === "number" && (typeof v.final_capital === "number" || typeof v.final_capital === "string");
+  };
+
+  let report: BacktestReport | null = null;
   try {
-    report = result ? JSON.parse(result.report_json) : null;
+    const parsed = result ? (JSON.parse(result.report_json) as unknown) : null;
+    report = isBacktestReport(parsed) ? parsed : null;
   } catch {
     report = null;
   }

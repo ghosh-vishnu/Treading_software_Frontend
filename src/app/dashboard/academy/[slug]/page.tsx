@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
+import { extractApiErrorMessage } from "@/lib/errors";
 import type { AcademyArticle } from "@/lib/types";
 
 export default function AcademyArticleDetailPage() {
@@ -25,16 +26,21 @@ export default function AcademyArticleDetailPage() {
     try {
       const response = await api.get<AcademyArticle>(`/academy/articles/${params.slug}`);
       setArticle(response.data);
-    } catch (err: any) {
-      if (err?.response?.status === 401) {
+    } catch (err: unknown) {
+      const status =
+        typeof err === "object" && err && "response" in err
+          ? ((err as { response?: { status?: unknown } }).response?.status as number | undefined)
+          : undefined;
+
+      if (status === 401) {
         clearTokens();
         router.push("/login");
         return;
       }
-      if (err?.response?.status === 404) {
+      if (status === 404) {
         setError("This academy article is not available right now.");
       } else {
-        setError("Unable to load article details.");
+        setError(extractApiErrorMessage(err, "Unable to load article details."));
       }
     } finally {
       setLoading(false);

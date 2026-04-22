@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
+import { extractApiErrorMessage } from "@/lib/errors";
 import type { AcademyArticle, AcademyArticleCreateRequest, UserProfile } from "@/lib/types";
 
 const DEFAULT_ARTICLE: AcademyArticleCreateRequest = {
@@ -21,7 +22,6 @@ export default function AcademyPage() {
   const [articles, setArticles] = useState<AcademyArticle[]>([]);
   const [form, setForm] = useState<AcademyArticleCreateRequest>(DEFAULT_ARTICLE);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -55,22 +55,6 @@ export default function AcademyPage() {
   const onLogout = () => {
     clearTokens();
     router.push("/login");
-  };
-
-  const createArticle = async () => {
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const res = await api.post<AcademyArticle>("/admin/academy/articles", form);
-      setArticles((current) => [res.data, ...current]);
-      setMessage("Article created.");
-      setForm(DEFAULT_ARTICLE);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to create article.");
-    } finally {
-      setSaving(false);
-    }
   };
 
   return (

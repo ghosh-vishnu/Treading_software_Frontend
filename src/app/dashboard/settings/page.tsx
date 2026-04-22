@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
+import { extractApiErrorMessage } from "@/lib/errors";
 import type { UserSettings, UserSettingsUpdateRequest } from "@/lib/types";
 
 const DEFAULT_FORM: UserSettingsUpdateRequest = {
@@ -62,8 +63,8 @@ export default function SettingsPage() {
     try {
       await api.patch<UserSettings>("/settings", form);
       setMessage("Settings updated.");
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to update settings.");
+    } catch (err: unknown) {
+      setError(extractApiErrorMessage(err, "Failed to update settings."));
     } finally {
       setSaving(false);
     }
@@ -76,8 +77,8 @@ export default function SettingsPage() {
     try {
       await api.patch("/settings/risk", riskForm);
       setMessage("Risk settings updated.");
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to update risk settings.");
+    } catch (err: unknown) {
+      setError(extractApiErrorMessage(err, "Failed to update risk settings."));
     } finally {
       setSaving(false);
     }

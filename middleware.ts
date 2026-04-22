@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const protectedPaths = ["/dashboard"];
+const protectedPaths = ["/dashboard", "/admin"];
 
 export function middleware(request: NextRequest) {
   const accessToken = request.cookies.get("access_token")?.value;
@@ -13,7 +13,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if ((pathname === "/login" || pathname === "/register") && accessToken) {
+  if ((pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") && accessToken) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
@@ -21,5 +21,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/register"],
+  matcher: ["/dashboard/:path*", "/admin/:path*", "/login", "/register", "/forgot-password"],
 };

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { api } from "@/lib/api";
 import { clearTokens, getAccessToken } from "@/lib/auth";
+import { extractApiErrorMessage } from "@/lib/errors";
 import type { BrokerAccount, UserProfile } from "@/lib/types";
 
 type ActiveTab = "profile" | "trading" | "password" | "notification";
@@ -92,7 +93,7 @@ const DEFAULT_BROKER_CONNECT_FORM: BrokerConnectFormState = {
   passphrase: "",
 };
 
-export default function ProfilePage() {
+function ProfilePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedTab = (searchParams.get("tab") || "profile") as ActiveTab;
@@ -241,9 +242,8 @@ export default function ProfilePage() {
       setProfile(user);
       setProfileForm((prev) => ({ ...prev, email: user.email }));
       setProfileMessage("Profile updated successfully.");
-    } catch (error: any) {
-      const detail = error?.response?.data?.detail;
-      setProfileError(typeof detail === "string" ? detail : "Failed to update profile.");
+    } catch (error: unknown) {
+      setProfileError(extractApiErrorMessage(error, "Failed to update profile."));
     } finally {
       setSavingProfile(false);
     }
@@ -281,9 +281,8 @@ export default function ProfilePage() {
       });
       setPasswordMessage(response.data.message || "Password updated successfully.");
       setPasswordForm(DEFAULT_PASSWORD_FORM);
-    } catch (error: any) {
-      const detail = error?.response?.data?.detail;
-      setPasswordError(typeof detail === "string" ? detail : "Failed to update password.");
+    } catch (error: unknown) {
+      setPasswordError(extractApiErrorMessage(error, "Failed to update password."));
     } finally {
       setUpdatingPassword(false);
     }
@@ -418,9 +417,8 @@ export default function ProfilePage() {
       }
 
       setTradingMessage("Broker account connected successfully.");
-    } catch (error: any) {
-      const detail = error?.response?.data?.detail;
-      setTradingError(typeof detail === "string" ? detail : "Failed to connect broker account.");
+    } catch (error: unknown) {
+      setTradingError(extractApiErrorMessage(error, "Failed to connect broker account."));
     } finally {
       setConnectingBroker(false);
     }
@@ -451,9 +449,8 @@ export default function ProfilePage() {
         }
       }
       setTradingMessage("Broker account removed successfully.");
-    } catch (error: any) {
-      const detail = error?.response?.data?.detail;
-      setTradingError(typeof detail === "string" ? detail : "Failed to remove broker account.");
+    } catch (error: unknown) {
+      setTradingError(extractApiErrorMessage(error, "Failed to remove broker account."));
     } finally {
       setRemovingAccountId(null);
     }
@@ -902,5 +899,23 @@ export default function ProfilePage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#050607] text-[#E8ECEF]">
+          <div className="mx-auto w-full max-w-[1100px] px-4 py-6 sm:px-6 lg:px-8">
+            <div className="rounded-2xl border border-[#1A1E23] bg-[#0A0D13] px-4 py-4 text-sm text-[#9AA5B1]">
+              Loading profile...
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <ProfilePageInner />
+    </Suspense>
   );
 }

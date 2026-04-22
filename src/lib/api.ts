@@ -1,31 +1,36 @@
 import axios from "axios";
+import type { AxiosRequestConfig } from "axios";
 
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "@/lib/auth";
 
 const rawApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-if (!rawApiBaseUrl) {
-  throw new Error("Missing required env: NEXT_PUBLIC_API_BASE_URL");
-}
-
-const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, "");
+// Don't throw at module import time (Next build/prerender evaluates modules).
+// We still want a clear failure when the client actually performs requests.
+const API_BASE_URL = rawApiBaseUrl ? rawApiBaseUrl.replace(/\/+$/, "") : "";
 
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  // Provide a harmless default to keep builds working when env isn't injected yet.
+  // Real deployments must set NEXT_PUBLIC_API_BASE_URL.
+  baseURL: API_BASE_URL || "http://localhost:8000/api/v1",
   timeout: 10000,
 });
 
 api.defaults.withCredentials = false;
 
+type HeadersWithOptionalSet = Record<string, string> & { set?: (key: string, value: string) => void };
+type RetriableAxiosRequestConfig = AxiosRequestConfig & { _retry?: boolean };
+
 api.interceptors.request.use((config) => {
+  if (!rawApiBaseUrl && typeof window !== "undefined") {
+    throw new Error("Missing required env: NEXT_PUBLIC_API_BASE_URL");
+  }
   const token = getAccessToken();
   if (token) {
     config.headers = config.headers ?? {};
-    if (typeof (config.headers as any).set === "function") {
-      (config.headers as any).set("Authorization", `Bearer ${token}`);
-    } else {
-      (config.headers as Record<string, string>).Authorization = `Bearer ${token}`;
-    }
+    const headers = config.headers as unknown as HeadersWithOptionalSet;
+    if (typeof headers.set === "function") headers.set("Authorization", `Bearer ${token}`);
+    else headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -33,7 +38,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config as RetriableAxiosRequestConfig | undefined;
 
     if (!originalRequest) {
       return Promise.reject(error);
@@ -55,11 +60,9 @@ api.interceptors.response.use(
 
         setTokens(refreshResponse.data.access_token, refreshResponse.data.refresh_token);
         originalRequest.headers = originalRequest.headers ?? {};
-        if (typeof (originalRequest.headers as any).set === "function") {
-          (originalRequest.headers as any).set("Authorization", `Bearer ${refreshResponse.data.access_token}`);
-        } else {
-          (originalRequest.headers as Record<string, string>).Authorization = `Bearer ${refreshResponse.data.access_token}`;
-        }
+        const headers = originalRequest.headers as unknown as HeadersWithOptionalSet;
+        if (typeof headers.set === "function") headers.set("Authorization", `Bearer ${refreshResponse.data.access_token}`);
+        else headers.Authorization = `Bearer ${refreshResponse.data.access_token}`;
         return api(originalRequest);
       } catch (refreshError) {
         clearTokens();

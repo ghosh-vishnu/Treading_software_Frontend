@@ -3,7 +3,16 @@ const REFRESH_TOKEN_KEY = "refresh_token";
 
 function setCookie(name: string, value: string, days: number) {
   const expires = new Date(Date.now() + days * 86400000).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+  const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+  document.cookie = [
+    `${name}=${encodeURIComponent(value)}`,
+    `expires=${expires}`,
+    "path=/",
+    "SameSite=Lax",
+    isHttps ? "Secure" : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
 }
 
 function getCookie(name: string): string | null {
@@ -12,7 +21,16 @@ function getCookie(name: string): string | null {
 }
 
 function deleteCookie(name: string) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
+  const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+  document.cookie = [
+    `${name}=`,
+    "expires=Thu, 01 Jan 1970 00:00:00 UTC",
+    "path=/",
+    "SameSite=Lax",
+    isHttps ? "Secure" : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
 }
 
 export function setTokens(accessToken: string, refreshToken: string) {
