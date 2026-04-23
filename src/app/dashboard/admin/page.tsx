@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import axios from "axios";
 
@@ -68,6 +68,13 @@ const tabs: { id: AdminTab; label: string }[] = [
   { id: "settings", label: "Settings" },
   { id: "security", label: "Security" },
 ];
+
+const tabIds = new Set<AdminTab>(tabs.map((tab) => tab.id));
+
+function parseAdminTab(value: string | null): AdminTab {
+  if (!value) return "overview";
+  return tabIds.has(value as AdminTab) ? (value as AdminTab) : "overview";
+}
 
 const emptyStrategy: StrategyFormState = {
   name: "",
@@ -137,8 +144,10 @@ function getAdminWebSocketUrl(): string | null {
 
 export default function AdminPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const [activeTab, setActiveTab] = useState<AdminTab>(() => parseAdminTab(searchParams.get("tab")));
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [metrics, setMetrics] = useState<AdminDashboardMetrics | null>(null);
   const [growth, setGrowth] = useState<ChartPoint[]>([]);
@@ -200,6 +209,27 @@ export default function AdminPage() {
     };
   }, [strategyForm]);
 
+  const setTab = useCallback(
+    (nextTab: AdminTab) => {
+      setActiveTab(nextTab);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", nextTab);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  useEffect(() => {
+    const routeTab = parseAdminTab(searchParams.get("tab"));
+    setActiveTab(routeTab);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (pathname.startsWith("/dashboard/admin")) {
+      router.replace(`/admin?${searchParams.toString() || "tab=overview"}`);
+    }
+  }, [pathname, router, searchParams]);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -207,8 +237,7 @@ export default function AdminPage() {
     try {
       const me = await api.get<UserProfile>("/auth/me");
       if (me.data.role !== "admin") {
-        setError("Admin privileges are required.");
-        setLoading(false);
+        router.replace("/dashboard");
         return;
       }
       setProfile(me.data);
@@ -384,7 +413,7 @@ export default function AdminPage() {
       is_public: item.is_public,
       is_featured: item.is_featured,
     });
-    setActiveTab("strategies");
+    setTab("strategies");
   };
 
   const resetStrategyForm = () => {
@@ -568,32 +597,36 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_10%_20%,rgba(59,130,246,0.18),transparent_30%),radial-gradient(circle_at_90%_0%,rgba(16,185,129,0.16),transparent_28%),linear-gradient(180deg,#04070D_0%,#04060A_100%)] text-[#ECF2FF]">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_8%_16%,rgba(56,189,248,0.2),transparent_32%),radial-gradient(circle_at_88%_2%,rgba(34,197,94,0.18),transparent_28%),linear-gradient(180deg,#050A12_0%,#03060D_100%)] text-[#ECF2FF]">
       <div className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8">
-        <header className="rounded-3xl border border-[#1D2A3A] bg-[#0C1522]/80 p-5 shadow-[0_30px_120px_-60px_rgba(0,0,0,0.8)] backdrop-blur">
+        <header className="relative overflow-hidden rounded-3xl border border-[#22344B] bg-[linear-gradient(120deg,rgba(10,18,30,0.92),rgba(8,21,35,0.82))] p-5 shadow-[0_30px_120px_-60px_rgba(0,0,0,0.8)] backdrop-blur">
+          <div className="pointer-events-none absolute -top-28 right-0 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.28)_0%,transparent_65%)]" />
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-[#90A9C7]">Mirror Trading Admin</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[#9CC4E8]">Mirror Trading Admin</p>
               <h1 className="mt-1 text-3xl font-semibold text-[#F6FAFF]">Command Center</h1>
-              <p className="mt-1 text-sm text-[#A9BDD5]">Unified control panel for strategy publishing, compliance, users, risk, and live operations.</p>
+              <p className="mt-1 text-sm text-[#B5CAE2]">Unified control panel for strategy publishing, compliance, users, risk, and live operations.</p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => router.push("/dashboard")} className="rounded-xl border border-[#2E4057] px-4 py-2 text-sm text-[#D5E4F7] hover:bg-[#132133]">Trader Dashboard</button>
-              <button onClick={onLogout} className="rounded-xl border border-[#2E4057] px-4 py-2 text-sm text-[#D5E4F7] hover:bg-[#132133]">Sign Out</button>
+              <button onClick={() => router.push("/dashboard")} className="rounded-xl border border-[#3B5674] bg-[#102035]/80 px-4 py-2 text-sm text-[#D5E4F7] transition hover:bg-[#16304D]">Trader Dashboard</button>
+              <button onClick={onLogout} className="rounded-xl border border-[#3B5674] bg-[#102035]/80 px-4 py-2 text-sm text-[#D5E4F7] transition hover:bg-[#16304D]">Sign Out</button>
             </div>
           </div>
-          <div className="mt-4 text-sm text-[#A6BCD6]">Logged in as {profile?.full_name} ({profile?.email})</div>
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-[#A6BCD6]">
+            <span>Logged in as {profile?.full_name} ({profile?.email})</span>
+            <span className="rounded-full border border-[#315E4A] bg-[#10251D] px-2.5 py-1 text-xs font-medium text-[#B9F6D2]">Live Control Mode</span>
+          </div>
         </header>
 
-        {error ? <p className="mt-4 rounded-xl border border-[#66313A] bg-[#2A1219] px-4 py-2 text-sm text-[#FFB3C0]">{error}</p> : null}
-        {message ? <p className="mt-4 rounded-xl border border-[#315E4A] bg-[#10251D] px-4 py-2 text-sm text-[#B9F6D2]">{message}</p> : null}
+        {error ? <p className="mt-4 rounded-xl border border-[#75414A] bg-[#2A1219]/95 px-4 py-2 text-sm text-[#FFB3C0]">{error}</p> : null}
+        {message ? <p className="mt-4 rounded-xl border border-[#3B7A62] bg-[#10251D]/95 px-4 py-2 text-sm text-[#B9F6D2]">{message}</p> : null}
 
-        <nav className="mt-5 flex gap-2 overflow-x-auto rounded-2xl border border-[#1D2A3A] bg-[#0B1320]/70 p-2 backdrop-blur">
+        <nav className="sticky top-3 z-20 mt-5 flex gap-2 overflow-x-auto rounded-2xl border border-[#213347] bg-[#0B1320]/85 p-2 shadow-[0_16px_40px_-30px_rgba(0,0,0,0.9)] backdrop-blur">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm transition ${activeTab === tab.id ? "bg-[#1A2F4A] text-[#ECF5FF]" : "text-[#9CB2CA] hover:bg-[#121E30]"}`}
+              onClick={() => setTab(tab.id)}
+              className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm transition ${activeTab === tab.id ? "bg-[linear-gradient(135deg,#1B3553,#1B4A57)] text-[#ECF5FF] shadow-[inset_0_0_0_1px_rgba(156,196,232,0.25)]" : "text-[#9CB2CA] hover:bg-[#121E30]"}`}
             >
               {tab.label}
             </button>
@@ -603,19 +636,19 @@ export default function AdminPage() {
         {activeTab === "overview" ? (
           <section className="mt-5 space-y-5">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-2xl border border-[#1E2A39] bg-[#0D1725]/70 p-4 backdrop-blur">
+              <div className="rounded-2xl border border-[#1E2A39] bg-[#0D1725]/70 p-4 backdrop-blur transition hover:-translate-y-0.5 hover:border-[#2C4460]">
                 <p className="text-xs uppercase tracking-[0.1em] text-[#88A4C6]">Total Users</p>
                 <p className="mt-3 text-3xl font-semibold">{metrics?.total_users ?? 0}</p>
               </div>
-              <div className="rounded-2xl border border-[#1E2A39] bg-[#0D1725]/70 p-4 backdrop-blur">
+              <div className="rounded-2xl border border-[#1E2A39] bg-[#0D1725]/70 p-4 backdrop-blur transition hover:-translate-y-0.5 hover:border-[#2C4460]">
                 <p className="text-xs uppercase tracking-[0.1em] text-[#88A4C6]">Active Traders</p>
                 <p className="mt-3 text-3xl font-semibold">{metrics?.active_traders ?? 0}</p>
               </div>
-              <div className="rounded-2xl border border-[#1E2A39] bg-[#0D1725]/70 p-4 backdrop-blur">
+              <div className="rounded-2xl border border-[#1E2A39] bg-[#0D1725]/70 p-4 backdrop-blur transition hover:-translate-y-0.5 hover:border-[#2C4460]">
                 <p className="text-xs uppercase tracking-[0.1em] text-[#88A4C6]">Revenue</p>
                 <p className="mt-3 text-3xl font-semibold">${formatCurrency(metrics?.revenue ?? "0")}</p>
               </div>
-              <div className="rounded-2xl border border-[#1E2A39] bg-[#0D1725]/70 p-4 backdrop-blur">
+              <div className="rounded-2xl border border-[#1E2A39] bg-[#0D1725]/70 p-4 backdrop-blur transition hover:-translate-y-0.5 hover:border-[#2C4460]">
                 <p className="text-xs uppercase tracking-[0.1em] text-[#88A4C6]">Profit Share</p>
                 <p className="mt-3 text-3xl font-semibold">${formatCurrency(metrics?.profit_share ?? "0")}</p>
               </div>
