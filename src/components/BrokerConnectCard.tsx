@@ -23,12 +23,16 @@ export function BrokerConnectCard({ onConnected }: Props) {
     setLoading(true);
     setMessage("");
     try {
-      const { data } = await api.post<BrokerAccount>("/broker/connect", {
-        broker_name: brokerName,
-        api_key: apiKey,
-        api_secret: apiSecret,
-        passphrase: passphrase || null,
-      });
+      const { data } = await api.post<BrokerAccount>(
+        "/broker/connect",
+        {
+          broker_name: brokerName,
+          api_key: apiKey,
+          api_secret: apiSecret,
+          passphrase: passphrase || null,
+        },
+        { timeout: 30000 }
+      );
       onConnected(data);
       setMessage("Broker connected successfully.");
     } catch (error: unknown) {

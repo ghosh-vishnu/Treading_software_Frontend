@@ -396,12 +396,16 @@ function ProfilePageInner() {
     setTradingMessage(null);
 
     try {
-      const response = await api.post<BrokerAccount>("/broker/connect", {
-        broker_name: selectedBrokerForConnect.id,
-        api_key: brokerConnectForm.api_key.trim(),
-        api_secret: brokerConnectForm.api_secret.trim(),
-        passphrase: brokerConnectForm.passphrase.trim() || null,
-      });
+      const response = await api.post<BrokerAccount>(
+        "/broker/connect",
+        {
+          broker_name: selectedBrokerForConnect.id,
+          api_key: brokerConnectForm.api_key.trim(),
+          api_secret: brokerConnectForm.api_secret.trim(),
+          passphrase: brokerConnectForm.passphrase.trim() || null,
+        },
+        { timeout: 30000 }
+      );
 
       const nextAccounts = [...connectedAccounts, response.data];
       setConnectedAccounts(nextAccounts);
