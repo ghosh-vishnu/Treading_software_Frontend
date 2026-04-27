@@ -156,10 +156,10 @@ export default function StrategiesPage() {
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-[#91A0AF]">Mirror Pip Style Board</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-[#91A0AF]">ATLUS BOARD</p>
               <h1 className="mt-1 text-[28px] font-semibold text-[#F6FAFF]">Sample Strategies</h1>
             </div>
-            <p className="text-sm text-[#9AA5B1]">Upload from admin panel, then users can mirror directly from here.</p>
+            {/* <p className="text-sm text-[#9AA5B1]">Upload from admin panel, then users can mirror directly from here.</p> */}
           </div>
         </header>
 
@@ -192,7 +192,7 @@ export default function StrategiesPage() {
                     <path d="M9 6l6 6-6 6" />
                   </svg>
                 </button>
-              </div> : null}
+              </div> : null} 
             </div>
 
             {useCarousel ? (
@@ -279,7 +279,7 @@ export default function StrategiesPage() {
                     </div>
 
                     <button className="mt-4 w-full rounded-xl bg-[#9BFF00] px-4 py-2 font-semibold text-[#11140D] hover:bg-[#B7FF45]">
-                      Mirror Strategy
+                      Explore Strategy
                     </button>
                   </article>
                 );
@@ -364,7 +364,7 @@ export default function StrategiesPage() {
                       </div>
 
                       <button className="mt-4 w-full rounded-xl bg-[#9BFF00] px-4 py-2 font-semibold text-[#11140D] hover:bg-[#B7FF45]">
-                        Mirror Strategy
+                        Explore Strategy
                       </button>
                     </article>
                   );

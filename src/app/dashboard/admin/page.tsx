@@ -603,7 +603,7 @@ export default function AdminPage() {
           <div className="pointer-events-none absolute -top-28 right-0 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.28)_0%,transparent_65%)]" />
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[#9CC4E8]">Mirror Trading Admin</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[#9CC4E8]">Atlus Trading Admin</p>
               <h1 className="mt-1 text-3xl font-semibold text-[#F6FAFF]">Command Center</h1>
               <p className="mt-1 text-sm text-[#B5CAE2]">Unified control panel for strategy publishing, compliance, users, risk, and live operations.</p>
             </div>
